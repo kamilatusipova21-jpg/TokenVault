@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sol-Canvas - Токенизация искусства на Solana</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            position: relative;
+        }
+        
+        .wallet-button {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .wallet-button:hover {
+            background: #7c3aed;
+            transform: translateY(-2px);
+        }
+        
+        .wallet-button.connected {
+            background: #10b981;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        .title {
+            font-size: 4rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #f472b6, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            font-size: 1.5rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .wallet-info {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+            backdrop-filter: blur(10px);
+            display: none;
+        }
+        
+        .main-card {
+            max-width: 48rem;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        
+        .artwork {
+            position: relative;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+        
+        .artwork img {
+            width: 100%;
+            height: 16rem;
+            object-fit: cover;
+        }
+        
+        .artwork-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+        }
+        
+        .artwork-info {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+        }
+        
+        .artwork-title {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+        
+        .artwork-artist {
+            font-size: 1.125rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .stat {
+            text-align: center;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 0.5rem;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+        
+        .stat-value.green { color: #10b981; }
+        .stat-value.blue { color: #3b82f6; }
+        .stat-value.purple { color: #a855f7; }
+        
+        .stat-label {
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .message {
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            display: none;
+        }
+        
+        .message.success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10b981;
+            color: #d1fae5;
+        }
+        
+        .message.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #fecaca;
+        }
+        
+        .action-area {
+            text-align: center;
+        }
+        
+        .purchase-area {
+            display: none;
+        }
+        
+        .purchase-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .buy-button {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            background: linear-gradient(45deg, #8b5cf6, #ec4899);
+            color: white;
+            border: none;
+            border-radius: 0.75rem;
+            font-size: 1.125rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 1rem;
+        }
+        
+        .buy-button:hover {
+            transform: scale(1.05);
+        }
+        
+        .buy-button:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .features {
+            margin-top: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .feature {
+            text-align: center;
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 0.75rem;
+        }
+        
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature-desc {
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .contract-info {
+            margin-top: 2rem;
+            text-align: center;
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .loading {
+            display: inline-flex;
+            align-items: center;
+        }
+        
+        .spinner {
+            width: 1.25rem;
+            height: 1.25rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            .title { font-size: 2.5rem; }
+            .subtitle { font-size: 1.25rem; }
+            .stats { grid-template-columns: 1fr; }
+            .features { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button id="connectWallet" class="wallet-button">
+            Подключить кошелек
+        </button>
+
+        <div class="header">
+            <h1 class="title">Sol-Canvas</h1>
+            <p class="subtitle">Токенизация искусства на Solana</p>
+            <div id="walletInfo" class="wallet-info">
+                <p style="color: #10b981; font-size: 0.875rem;">Кошелек: AKeydQ2q...xGQVAYuG</p>
+                <p style="color: #3b82f6; font-size: 0.875rem;">Баланс: 0.0712 SOL</p>
+            </div>
+        </div>
+
+        <div class="main-card">
+            <div class="artwork">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/1280px-Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg" alt="Starry Night">
+                <div class="artwork-overlay"></div>
+                <div class="artwork-info">
+                    <h2 class="artwork-title">Звездная ночь</h2>
+                    <p class="artwork-artist">Винсент ван Гог, 1889</p>
+                </div>
+            </div>
+
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value green">$84M</div>
+                    <div class="stat-label">Оценочная стоимость</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value blue" id="availableFractions">1,000</div>
+                    <div class="stat-label">Доступно фракций</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value purple">$84K</div>
+                    <div class="stat-label">Цена за фракцию</div>
+                </div>
+            </div>
+
+            <!-- Панель активов пользователя -->
+            <div id="userAssetsPanel" class="stats" style="display: none; margin-top: 1rem; border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 0.75rem; padding: 1rem;">
+                <div class="stat">
+                    <div class="stat-value purple" id="userFractions">0</div>
+                    <div class="stat-label">Мои фракции</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value green" id="userValue">$0</div>
+                    <div class="stat-label">Стоимость портфеля</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value blue" id="userOwnership">0%</div>
+                    <div class="stat-label">Доля владения</div>
+                </div>
+            </div>
+
+            <div id="messageArea" class="message"></div>
+
+            <div id="actionArea" class="action-area">
+                <p style="margin-bottom: 1rem; font-size: 1.125rem;">Подключите кошелек для покупки фракций</p>
+                <p style="font-size: 0.875rem; color: rgba(255, 255, 255, 0.7);">
+                    Убедитесь, что ваш кошелек настроен на Devnet
+                </p>
+            </div>
+
+            <div id="purchaseArea" class="purchase-area">
+                <div class="purchase-info">
+                    <div>
+                        <div style="font-weight: 600;">Покупка 1 фракции</div>
+                        <div style="font-size: 0.875rem; color: rgba(255, 255, 255, 0.7);">0.00001 SOL (~$0.002)</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 1.125rem; font-weight: bold;">1/1000</div>
+                        <div style="font-size: 0.875rem; color: rgba(255, 255, 255, 0.7);">доля владения</div>
+                    </div>
+                </div>
+                
+                <button id="buyButton" class="buy-button">
+                    🎨 Купить фракцию NFT
+                </button>
+
+                <div style="text-align: center; font-size: 0.875rem; color: rgba(255, 255, 255, 0.7);">
+                    <p>После покупки вы станете совладельцем произведения искусства</p>
+                    <p>Фракции можно продавать и обменивать на маркетплейсе</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">🔒</div>
+                <h3 class="feature-title">Безопасность</h3>
+                <p class="feature-desc">Смарт-контракты на Solana обеспечивают прозрачность и безопасность</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <h3 class="feature-title">Быстрые транзакции</h3>
+                <p class="feature-desc">Мгновенные переводы с минимальными комиссиями</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🌍</div>
+                <h3 class="feature-title">Глобальный доступ</h3>
+                <p class="feature-desc">Инвестируйте в искусство из любой точки мира</p>
+            </div>
+        </div>
+
+        <div class="contract-info">
+            <p>Smart Contract: ALuf64RcUJFPdsXdxi2p4rYoQBe13UX9RW27sfDWnDaa</p>
+            <p>Network: Solana Devnet | Slot: 407605719</p>
+            <p style="margin-top: 0.5rem; font-size: 0.75rem;">
+                Откройте консоль браузера (F12) для просмотра API запросов
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let walletConnected = false;
+        let currentBalance = 0.07122944; // Реальный баланс из Solana
+        let userAssets = 0;
+        let totalTransactions = 0;
+        let availableFractions = 1000;
+        let totalFractions = 1000;
+
+        // Функция для форматирования баланса
+        function formatBalance(balance) {
+            return balance.toFixed(8);
+        }
+
+        // Функция для обновления баланса
+        function updateBalance(newBalance) {
+            currentBalance = newBalance;
+            const balanceElement = document.querySelector('#walletInfo p:last-child');
+            if (balanceElement) {
+                balanceElement.textContent = `Баланс: ${formatBalance(currentBalance)} SOL`;
+                
+                // Анимация изменения баланса
+                balanceElement.style.color = '#ef4444'; // Красный для уменьшения
+                setTimeout(() => {
+                    balanceElement.style.color = '#3b82f6'; // Обратно к синему
+                }, 1000);
+            }
+        }
+
+        // Функция для обновления активов
+        function updateAssets(newAssets) {
+            userAssets = newAssets;
+            availableFractions = totalFractions - userAssets;
+            
+            // Обновляем основную информацию
+            const assetsElement = document.getElementById('userAssets');
+            if (assetsElement) {
+                assetsElement.textContent = `Мои активы: ${userAssets} фракций`;
+                
+                // Анимация изменения активов
+                assetsElement.style.color = '#10b981'; // Зеленый для увеличения
+                setTimeout(() => {
+                    assetsElement.style.color = '#a855f7'; // Обратно к фиолетовому
+                }, 1000);
+            }
+            
+            // Обновляем панель активов пользователя
+            document.getElementById('userFractions').textContent = userAssets;
+            document.getElementById('userValue').textContent = `$${(userAssets * 84000).toLocaleString()}`;
+            document.getElementById('userOwnership').textContent = `${(userAssets / totalFractions * 100).toFixed(1)}%`;
+            document.getElementById('availableFractions').textContent = availableFractions.toLocaleString();
+            
+            // Показываем панель активов если есть активы
+            const assetsPanel = document.getElementById('userAssetsPanel');
+            if (userAssets > 0) {
+                assetsPanel.style.display = 'block';
+                
+                // Анимация появления
+                assetsPanel.style.opacity = '0';
+                assetsPanel.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    assetsPanel.style.transition = 'all 0.5s ease';
+                    assetsPanel.style.opacity = '1';
+                    assetsPanel.style.transform = 'translateY(0)';
+                }, 100);
+            }
+        }
+
+        // Симуляция реального API запроса к Solana
+        async function fetchRealBalance() {
+            // Симуляция запроса к Solana RPC
+            console.log('🔍 Запрос к Solana RPC API...');
+            console.log('GET https://api.devnet.solana.com');
+            console.log('Method: getBalance');
+            console.log('Account: AKeydQ2qxGQVAYuGD7nzYYxSdzRM8yVDWtgYWWwxANgQ');
+            
+            // Симуляция ответа
+            const mockResponse = {
+                jsonrpc: "2.0",
+                result: {
+                    context: { slot: 407605719 },
+                    value: Math.floor(currentBalance * 1000000000) // lamports
+                },
+                id: 1
+            };
+            
+            console.log('📥 Ответ от Solana:', mockResponse);
+            return currentBalance;
+        }
+
+        // Симуляция запроса активов пользователя
+        async function fetchUserAssets() {
+            console.log('🔍 Запрос активов пользователя...');
+            console.log('GET Smart Contract: ALuf64RcUJFPdsXdxi2p4rYoQBe13UX9RW27sfDWnDaa');
+            console.log('Method: getTokenAccountsByOwner');
+            
+            const mockAssets = {
+                tokenAccounts: userAssets,
+                totalValue: userAssets * 84000, // $84K за фракцию
+                lastUpdated: new Date().toISOString()
+            };
+            
+            console.log('📥 Активы пользователя:', mockAssets);
+            return userAssets;
+        }
+
+        document.getElementById('connectWallet').addEventListener('click', async function() {
+            if (!walletConnected) {
+                walletConnected = true;
+                this.textContent = 'Подключение...';
+                this.disabled = true;
+                
+                // Симуляция подключения к кошельку
+                setTimeout(async () => {
+                    this.textContent = 'Кошелек подключен ✓';
+                    this.classList.add('connected');
+                    this.disabled = false;
+                    
+                    document.getElementById('walletInfo').style.display = 'block';
+                    document.getElementById('actionArea').style.display = 'none';
+                    document.getElementById('purchaseArea').style.display = 'block';
+                    
+                    // Получаем актуальный баланс
+                    console.log('🔄 Инициализация кошелька...');
+                    await fetchRealBalance();
+                    await fetchUserAssets();
+                    console.log('✅ Кошелек успешно подключен!');
+                    
+                    // Запускаем периодическое обновление баланса
+                    setInterval(async () => {
+                        await fetchRealBalance();
+                    }, 10000); // Каждые 10 секунд
+                    
+                }, 1500);
+            }
+        });
+
+        document.getElementById('buyButton').addEventListener('click', async function() {
+            const messageArea = document.getElementById('messageArea');
+            const button = this;
+            
+            button.innerHTML = '<div class="loading"><div class="spinner"></div>Отправка транзакции...</div>';
+            button.disabled = true;
+            
+            // Симуляция реальной транзакции
+            console.log('🚀 Отправка транзакции в Solana...');
+            console.log('Program ID: ALuf64RcUJFPdsXdxi2p4rYoQBe13UX9RW27sfDWnDaa');
+            console.log('Method: buy_fractions');
+            console.log('Amount: 1 фракция');
+            console.log('Cost: 0.00001 SOL + gas fees');
+            
+            setTimeout(async () => {
+                totalTransactions++;
+                const txHash = `5sRxcDL5rNHKciJGv6vWZysZBNMuE3HzMtLZjVJhb9dX${totalTransactions}`;
+                
+                console.log('✅ Транзакция подтверждена!');
+                console.log('Transaction Hash:', txHash);
+                console.log('Block:', 407605719 + totalTransactions);
+                console.log('Gas Used: 0.000005 SOL');
+                
+                messageArea.innerHTML = `
+                    <p>✅ Фракция NFT успешно куплена!</p>
+                    <p style="font-size: 0.875rem; margin-top: 0.25rem;">Транзакция: ${txHash.slice(0, 8)}...${txHash.slice(-8)}</p>
+                    <p style="font-size: 0.875rem;">Вы теперь владеете ${((userAssets + 1) * 0.1).toFixed(1)}% произведения искусства!</p>
+                    <p style="font-size: 0.875rem; color: #10b981;">Блок: ${407605719 + totalTransactions}</p>
+                `;
+                messageArea.className = 'message success';
+                messageArea.style.display = 'block';
+                
+                // Обновляем баланс (уменьшаем на стоимость транзакции)
+                const transactionCost = 0.00001 + 0.000005; // Стоимость + газ
+                updateBalance(currentBalance - transactionCost);
+                
+                // Обновляем количество активов
+                updateAssets(userAssets + 1);
+                
+                button.innerHTML = '🎉 Фракция куплена!';
+                button.style.background = '#10b981';
+                
+                // Через 3 секунды возвращаем кнопку в исходное состояние
+                setTimeout(() => {
+                    button.innerHTML = '🎨 Купить еще фракцию NFT';
+                    button.style.background = 'linear-gradient(45deg, #8b5cf6, #ec4899)';
+                    button.disabled = false;
+                    messageArea.style.display = 'none';
+                }, 5000);
+                
+            }, 3000);
+        });
+
+        // Добавляем счетчик активов в интерфейс
+        document.addEventListener('DOMContentLoaded', function() {
+            const walletInfo = document.getElementById('walletInfo');
+            const assetsDiv = document.createElement('p');
+            assetsDiv.id = 'userAssets';
+            assetsDiv.style.color = '#a855f7';
+            assetsDiv.style.fontSize = '0.875rem';
+            assetsDiv.textContent = 'Мои активы: 0 фракций';
+            walletInfo.appendChild(assetsDiv);
+        });
+    </script>
+</body>
+</html>
